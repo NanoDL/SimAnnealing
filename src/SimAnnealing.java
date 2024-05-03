@@ -19,21 +19,30 @@ public class SimAnnealing {
     private static int[] resources = {2, 3, 2, 4, 2, 3, 4,};
 
     private static int maxResources;
+    private static List<Task> tasks;
 
     public static void main(String[] args) throws IOException {
         maxResources = TaskReader.readMaxResources("plan0.txt");
-        System.out.println(maxResources);
-        int[] order = generateNewOrder(startOrder);
+        tasks = TaskReader.readTasksFromFile("plan0.txt");
+
+
+        System.out.println(tasks.toString());
+        System.out.println(calculateDuration(tasks));
+       /* tasks = generateNewOrder(tasks);
+        System.out.println(tasks.toString());
+        System.out.println(calculateDuration(tasks));*/
+
+        //int[] order = generateNewOrder(startOrder);
         double temp = MAX_TEMP;
         int it = 1;
         while (temp > MIN_TEMP) {
-            int currentDuration = calculateDuration(order);
-            int[] newOrder = generateNewOrder(order);
+            int currentDuration = calculateDuration(tasks);
+            var newTasks = generateNewOrder(tasks);
 
-            int newDuration = calculateDuration(newOrder);
+            int newDuration = calculateDuration(newTasks);
 
             if (acceptanceProbability(currentDuration, newDuration, temp) >= Math.random()) {
-                order = newOrder;
+                tasks = newTasks;
             }
 
             temp =  (temp * (1 - COOLING_RATE));
@@ -42,13 +51,13 @@ public class SimAnnealing {
             it++;
         }
 
-        System.out.println("Optimal task order: " + Arrays.toString(order));
-        System.out.println("Project duration: " + calculateDuration(order));
+        System.out.println("Optimal task order: " + tasks.toString());
+        System.out.println("Project duration: " + calculateDuration(tasks));
         System.out.println("Iterations: "+ it);;
 
 
-        System.out.println(Arrays.toString(startOrder));
-        System.out.println(calculateDuration(startOrder));
+        /*System.out.println(Arrays.toString(startOrder));
+        System.out.println(calculateDuration(startOrder));*/
     }
 
     public static double acceptanceProbability(int currentDuration, int newDuration,double temp){
@@ -68,6 +77,15 @@ public class SimAnnealing {
         }
         //System.out.println("Вышел");
         return newOrder;
+    }
+
+    public static List<Task> generateNewOrder (List<Task> tasks) {
+        List<Task> newTasks = new ArrayList<>(tasks);
+        Collections.swap(newTasks,new Random().nextInt(newTasks.size()), new Random().nextInt(newTasks.size()));
+        while (!isValid(newTasks)){
+            Collections.swap(newTasks,new Random().nextInt(newTasks.size()), new Random().nextInt(newTasks.size()));
+        }
+        return newTasks;
     }
 
     public static void swap(int[] arr, int i, int j){
@@ -95,6 +113,24 @@ public class SimAnnealing {
         return projectDuration;
     }
 
+    public static int calculateDuration (List<Task> tasks){
+        int currentBusyResources = 0;
+        int projectDuration = 0;
+        //List<Task> scheduledTasks = new ArrayList<>();
+
+        for (var task : tasks) {
+            if (currentBusyResources + task.resource <= maxResources) {
+                currentBusyResources += task.resource;
+                projectDuration = Math.max(projectDuration, task.duration);
+                // scheduledTasks.add(task);
+            } else {
+                currentBusyResources = task.resource;
+                projectDuration += task.duration;
+                // scheduledTasks.add(task);
+            }
+        }
+        return projectDuration;
+    }
 
     public static boolean isValid(int[] order) {
 
@@ -107,6 +143,21 @@ public class SimAnnealing {
                 return false;
             }
 
+        }
+        return true;
+    }
+    public static boolean isValid (List<Task> tasks){
+        for (var task : tasks){
+            int id1 = tasks.indexOf(task);
+            for (var follow : task.followers){
+                Task taskFind = tasks.stream()
+                        .filter(t -> t.id == follow)
+                        .findFirst()
+                        .orElse(null);
+                if (id1 > tasks.indexOf(taskFind)){
+                    return false;
+                }
+             }
         }
         return true;
     }
@@ -127,7 +178,16 @@ class Task {
         this.followers = followers;
     }
 
-
+    @Override
+    public String toString() {
+        return "Task{" +
+                "id=" + id +
+                ", duration=" + duration +
+                ", resource=" + resource +
+                ", numFollowers=" + numFollowers +
+                ", followers=" + followers +
+                "}\n";
+    }
 }
 
 class TaskReader {
@@ -142,7 +202,7 @@ class TaskReader {
                 for (int i = 0; i < numTasks; i++) {
                     line = br.readLine(); // читаем следующую строку
                     String[] tokens = line.split("\\s+"); // разбиваем строку по пробелам
-                    int id = i;
+                    int id = i+1;
                     int duration = Integer.parseInt(tokens[0]);
                     int resource = Integer.parseInt(tokens[1]);
                     int numFollowers = Integer.parseInt(tokens[2]);
